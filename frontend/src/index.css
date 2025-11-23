@@ -1,0 +1,18 @@
+/* ------------------------------------------- */
+/* CẤU HÌNH CHO TAILWIND CSS VÀ FONT INTER */
+/* ------------------------------------------- */
+
+/* Import Font Inter (Bắt buộc) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+/* Lệnh bắt buộc để Tailwind hoạt động (RẤT QUAN TRỌNG) */
+/* Xóa bỏ toàn bộ CSS mặc định của Vite để tránh xung đột với Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Định nghĩa lớp font Inter toàn cục */
+/* Lớp này được sử dụng trên thẻ <div> chính trong App.jsx */
+.font-inter { 
+    font-family: 'Inter', sans-serif; 
+}
