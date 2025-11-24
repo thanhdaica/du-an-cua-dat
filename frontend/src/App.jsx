@@ -47,17 +47,15 @@ function App() {
               }`}
             >
               {walletAddress ? (
-                // TRẠNG THÁI: ĐÃ KẾT NỐI (Hiển thị Profile)
-                <div className="flex items-center gap-3 px-2 pr-4">
-                  {/* Avatar giả lập bằng Gradient */}
+                // TRẠNG THÁI: ĐÃ KẾT NỐI
+                  <div className="flex items-center gap-3 px-2 pr-4">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 border-2 border-gray-800 shadow-sm"></div>
                   
                   <div className="flex flex-col items-start">
-                    {/* Tên người dùng ẩn danh */}
+                    {/* Sửa dòng này: Hiển thị "User" + 4 số cuối ví thay vì username */}
                     <span className="text-sm font-bold text-white leading-none mb-1">
-                      {currentUser?.username || "Đang tải..."}
+                      User {walletAddress.slice(-4)} 
                     </span>
-                    {/* Địa chỉ ví nhỏ bên dưới */}
                     <span className="text-[10px] font-mono text-gray-400 bg-gray-900 px-1.5 rounded tracking-wide">
                       {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                     </span>

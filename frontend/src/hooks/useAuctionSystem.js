@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import AuctionSystemABI from "../AuctionSystem.json"; // Import file JSON vừa copy
 
 // Địa chỉ Contract (Lấy từ log khi chạy truffle migrate hoặc xem trên Ganache)
-const CONTRACT_ADDRESS = "0x492Ae64A545E6EEE827ed2be4bd960E3899eb812"; 
+const CONTRACT_ADDRESS = "0x45472117266f2B7878E8DB8E21d0015e359A75cE"; 
 
 export const useAuctionSystem = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -122,6 +122,7 @@ export const useAuctionSystem = () => {
     placeBid,
     fetchAuctionDetail: async (id) => { /* Logic lấy chi tiết */ },
     createNewAuction,
-    loading
+    loading,
+    fetchAuctions
   };
 };
