@@ -1,10 +1,9 @@
-// frontend/src/hooks/useAuctionSystem.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
-import AuctionSystemABI from "../AuctionSystem.json"; // Import file JSON vừa copy
+import AuctionSystemABI from "../AuctionSystem.json";
 
-// Địa chỉ Contract (Lấy từ log khi chạy truffle migrate hoặc xem trên Ganache)
-const CONTRACT_ADDRESS = "0x45472117266f2B7878E8DB8E21d0015e359A75cE"; 
+// ⚠️ LƯU Ý: CẬP NHẬT ĐỊA CHỈ NÀY MỖI KHI DEPLOY LẠI TRUFFLE
+const CONTRACT_ADDRESS = "0xAd277C8C5c49fA080ec5E6a54bF3130395Cbe971"; 
 
 export const useAuctionSystem = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -12,117 +11,166 @@ export const useAuctionSystem = () => {
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // 1. Kết nối ví & Khởi tạo Contract
+  // 1. Kết nối ví MetaMask
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
         const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         setWalletAddress(accounts[0]);
-
-        // Tạo đối tượng tương tác Smart Contract
+        
+        // Tạo provider và signer để GHI dữ liệu (tạo auction, bid)
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const auctionContract = new ethers.Contract(CONTRACT_ADDRESS, AuctionSystemABI.abi, signer);
         
         setContract(auctionContract);
-        console.log("Đã kết nối Contract!");
+        console.log("Đã kết nối ví & Contract Write Mode!");
       } catch (error) {
-        console.error("Lỗi kết nối:", error);
+        console.error("Lỗi kết nối ví:", error);
       }
     } else {
-      alert("Cần cài MetaMask!");
+      alert("Vui lòng cài đặt MetaMask!");
     }
   };
 
-  // 2. Lấy danh sách từ Blockchain (Thay vì API Node.js)
-  const fetchAuctions = async () => {
+  // 2. Lấy danh sách đấu giá (Dùng Provider thường để đọc nhanh không cần ví)
+  // Sử dụng useCallback để tránh tạo lại hàm liên tục gây loop
+  const fetchAuctions = useCallback(async () => {
     if (!window.ethereum) return;
     setLoading(true);
     try {
-        // Dùng Provider để đọc dữ liệu (không cần ví connect cũng đọc được)
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const readContract = new ethers.Contract(CONTRACT_ADDRESS, AuctionSystemABI.abi, provider);
+      // Dùng Provider để đọc dữ liệu (không cần signer)
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const readContract = new ethers.Contract(CONTRACT_ADDRESS, AuctionSystemABI.abi, provider);
 
-        const count = await readContract.getCount(); // Gọi hàm getCount trong Solidity
-        const items = [];
+      const count = await readContract.getCount(); // Gọi hàm đếm số lượng
+      console.log("Tổng số auctions:", count.toString());
 
-        // Duyệt qua từng ID để lấy thông tin
-        for (let i = 1; i <= count; i++) {
-            const item = await readContract.auctions(i);
+      const items = [];
+      for (let i = 1; i <= count; i++) { // Giả sử ID bắt đầu từ 1
+        const item = await readContract.auctions(i);
+        // Chỉ lấy nếu ID hợp lệ (khác 0)
+        if(item.id.toString() !== "0") {
             items.push({
-                _id: Number(item.id),
-                title: item.title,
-                description: item.description,
-                imageUrl: item.imageUrl,
-                currentBid: ethers.formatEther(item.currentBid), // Đổi từ Wei sang ETH
-                highestBidder: item.highestBidder === "0x0000000000000000000000000000000000000000" ? null : item.highestBidder,
-                endTime: new Date(Number(item.endTime) * 1000).toISOString(), // Đổi timestamp sang Date
+              _id: item.id.toString(),
+              title: item.title,
+              description: item.description,
+              imageUrl: item.imageUrl,
+              startPrice: ethers.formatEther(item.startPrice),
+              currentBid: ethers.formatEther(item.currentBid), // Convert Wei -> ETH
+              highestBidder: item.highestBidder,
+              endTime: Number(item.endTime), // Convert BigInt -> Number
+              active: item.active,
             });
         }
-        setAuctions(items);
+      }
+      setAuctions(items);
     } catch (error) {
-        console.error("Lỗi lấy dữ liệu:", error);
+      console.error("Lỗi lấy dữ liệu:", error);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-  };
+  }, []); // Dependency rỗng
 
-  // 3. Đấu giá (Gửi Transaction lên Ganache)
+  // 3. Đặt giá (Bid)
   const placeBid = async (auctionId, amountETH) => {
-    if (!contract) return alert("Chưa kết nối Contract!");
+    if (!contract) {
+        alert("Vui lòng kết nối ví trước!");
+        await connectWallet();
+        return;
+    }
     try {
-      const weiAmount = ethers.parseEther(amountETH.toString()); // Đổi ETH sang Wei
-      
-      // Gọi hàm placeBid trong Solidity
+      const weiAmount = ethers.parseEther(amountETH.toString());
       const tx = await contract.placeBid(auctionId, { value: weiAmount });
-      
       alert("Đang xử lý giao dịch...");
-      await tx.wait(); // Chờ Ganache xác nhận block
-      
+      await tx.wait(); 
       alert("Đấu giá thành công!");
-      fetchAuctions(); // Reload lại list
+      fetchAuctions(); 
     } catch (error) {
       console.error(error);
       alert("Lỗi: " + (error.reason || error.message));
     }
   };
 
-  // 4. Tạo đấu giá mới (Gửi Transaction)
+  // 4. Tạo đấu giá mới (Sửa logic kiểm tra contract)
   const createNewAuction = async (data) => {
-      if (!contract) return alert("Chưa kết nối!");
+      // Kiểm tra xem đã có instance contract (đã kết nối ví) chưa
+      let currentContract = contract;
+      if (!currentContract) {
+           if (window.ethereum) {
+                // Thử kết nối lại nhanh nếu chưa có
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                const signer = await provider.getSigner();
+                currentContract = new ethers.Contract(CONTRACT_ADDRESS, AuctionSystemABI.abi, signer);
+                setContract(currentContract);
+           } else {
+               alert("Chưa kết nối ví!");
+               return false;
+           }
+      }
+
       try {
-          const duration = 86400; // Mặc định 1 ngày (tính bằng giây)
+          const duration = 86400; 
           const startPriceWei = ethers.parseEther(data.startPrice.toString());
 
-          const tx = await contract.createAuction(
+          console.log("Đang tạo auction với giá:", startPriceWei.toString());
+
+          const tx = await currentContract.createAuction(
               data.title,
               data.description,
               data.imageUrl,
               startPriceWei,
               duration
           );
+          
+          alert("Đang chờ xác nhận trên Blockchain...");
           await tx.wait();
-          alert("Đã tạo thành công trên Blockchain!");
+          alert("Đã tạo thành công!");
           return true;
       } catch (error) {
-          console.error(error);
+          console.error("Lỗi tạo:", error);
+          alert("Lỗi tạo: " + (error.reason || error.message));
           return false;
       }
   };
 
+  // 5. Lấy chi tiết 1 Auction (Thêm mới hàm này)
+  const fetchAuctionDetail = async (id) => {
+    if (!window.ethereum) return null;
+    try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const readContract = new ethers.Contract(CONTRACT_ADDRESS, AuctionSystemABI.abi, provider);
+        
+        const item = await readContract.auctions(id);
+        return {
+            _id: item.id.toString(),
+            title: item.title,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            currentBid: ethers.formatEther(item.currentBid),
+            highestBidder: item.highestBidder,
+            endTime: new Date(Number(item.endTime) * 1000).toISOString(), // Convert sang ISO string cho dễ dùng
+            active: item.active
+        };
+    } catch (error) {
+        console.error("Lỗi lấy chi tiết:", error);
+        return null;
+    }
+  }
+
   // Tự động load khi vào trang
   useEffect(() => {
       fetchAuctions();
-  }, []);
+  }, [fetchAuctions]);
 
   return {
     walletAddress,
     connectWallet,
     auctions,
     placeBid,
-    fetchAuctionDetail: async (id) => { /* Logic lấy chi tiết */ },
+    fetchAuctionDetail, // <--- Đã thêm hàm này
     createNewAuction,
     loading,
-    fetchAuctions
+    fetchAuctions // <--- QUAN TRỌNG: Phải return hàm này
   };
 };
